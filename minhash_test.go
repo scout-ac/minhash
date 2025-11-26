@@ -9,17 +9,17 @@ func TestNewPermutations(t *testing.T) {
 	seed := int64(0)
 	p := NewPermutations(size, seed)
 	if p.size != size {
-		t.Fatal("Size expected %d but got %d", size, p.size)
+		t.Fatalf("Size expected %d but got %d", size, p.size)
 	}
 	if p.seed != seed {
-		t.Fatal("Seed expected %d but got %d", seed, p.seed)
+		t.Fatalf("Seed expected %d but got %d", seed, p.seed)
 	}
 	for _, value := range p.values {
 		if value.a < 1 || value.a > mersennePrime {
-			t.Fatal("Random %d out of bounds", value.a)
+			t.Fatalf("Random %d out of bounds", value.a)
 		}
 		if value.b < 0 || value.b > mersennePrime {
-			t.Fatal("Random %d out of bounds", value.b)
+			t.Fatalf("Random %d out of bounds", value.b)
 		}
 	}
 }
@@ -29,15 +29,15 @@ func TestNewMinhash(t *testing.T) {
 	perms := NewPermutations(64, int64(0))
 	m := NewMinhash(perms)
 	if len(m.hashvalues) != perms.size {
-		t.Fatal("Hashvalues expected size %d but got %d", 64, len(m.hashvalues))
+		t.Fatalf("Hashvalues expected size %d but got %d", 64, len(m.hashvalues))
 	}
 	if len(m.permutations.values) != perms.size {
-		t.Fatal("Permutations expected size %d but got %d", 64, len(m.permutations.values))
+		t.Fatalf("Permutations expected size %d but got %d", 64, len(m.permutations.values))
 	}
 
 	for _, value := range m.hashvalues {
 		if value != infinity {
-			t.Fatal("Expected infinity but got %d", value)
+			t.Fatalf("Expected infinity but got %d", value)
 		}
 	}
 
@@ -64,9 +64,12 @@ func TestJaccardSame(t *testing.T) {
 		m2.Update([]byte(s))
 	}
 
-	ans := m1.Jaccard(m2)
+	ans, err := m1.Jaccard(m2)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	if ans != 1 {
-		t.Fatal("We should get similarity of 1")
+		t.Fatalf("We should get similarity of 1")
 	}
 }
 
@@ -83,9 +86,12 @@ func TestJaccardDifferent(t *testing.T) {
 		m2.Update([]byte(s))
 	}
 
-	ans := m1.Jaccard(m2)
+	ans, err := m1.Jaccard(m2)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	if ans != 0 {
-		t.Fatal("We should get similarity of 0 but got %f", ans)
+		t.Fatalf("We should get similarity of 0 but got %f", ans)
 	}
 }
 
@@ -102,15 +108,17 @@ func TestJaccardHalfEqual(t *testing.T) {
 		m2.Update([]byte(s))
 	}
 
-	ans := m1.Jaccard(m2)
-
+	ans, err := m1.Jaccard(m2)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	if ans <= 0.3 {
-		t.Fatal("We should get similarity of at least 0.3 but got %f", ans)
+		t.Fatalf("We should get similarity of at least 0.3 but got %f", ans)
 	}
 
 }
 
-func Testrandom(t *testing.T) {
+func TestRandom(t *testing.T) {
 	value := random(uint64(0), uint64(10))
 	if value > 10 {
 		t.Fatal("Expected less that 10")
@@ -120,7 +128,7 @@ func Testrandom(t *testing.T) {
 		t.Fatal("Expected zero")
 	}
 	value = random(uint64(100), uint64(100))
-	if value != 0 {
+	if value != 100 {
 		t.Fatal("Expected hundred")
 	}
 }

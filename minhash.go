@@ -1,6 +1,7 @@
 package minhash
 
 import (
+	"fmt"
 	"hash/fnv"
 	"math"
 	"math/rand"
@@ -10,10 +11,6 @@ const (
 	infinity      uint64 = math.MaxUint64
 	mersennePrime        = uint64((1 << 61) - 1)
 )
-
-func random(min uint64, max uint64) uint64 {
-	return uint64(rand.Int63n(int64(max-min+1))) + min
-}
 
 type permutation struct {
 	a uint64
@@ -29,6 +26,10 @@ type permutations struct {
 type minhash struct {
 	permutations *permutations
 	hashvalues   []uint64
+}
+
+func random(min uint64, max uint64) uint64 {
+	return uint64(rand.Int63n(int64(max-min+1))) + min
 }
 
 func NewPermutations(size int, seed int64) *permutations {
@@ -68,9 +69,9 @@ func (m *minhash) Update(b []byte) {
 
 }
 
-func (m *minhash) Jaccard(other *minhash) float64 {
+func (m *minhash) Jaccard(other *minhash) (float64, error) {
 	if m.permutations.size != other.permutations.size {
-		panic("Size mismatch.")
+		return float64(0), fmt.Errorf("Size mismatch")
 	}
 	common := 0
 	for i := range m.hashvalues {
@@ -78,7 +79,7 @@ func (m *minhash) Jaccard(other *minhash) float64 {
 			common++
 		}
 	}
-	return float64(common) / float64(m.permutations.size)
+	return float64(common) / float64(m.permutations.size), nil
 }
 
 func (m *minhash) initHashvalues() {

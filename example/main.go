@@ -3,9 +3,10 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/gosom/go-minhash"
 	"os"
 	"time"
+
+	"scout.ac/go/minhash"
 )
 
 func main() {
@@ -35,8 +36,11 @@ func main() {
 	for _, t := range tokens2 {
 		m2.Update([]byte(t))
 	}
-	similarity := m2.Jaccard(m1)
+	similarity, err := m2.Jaccard(m1)
+	if err != nil {
+		panic(err)
+	}
 
 	elapsed := time.Since(start)
-	fmt.Println("Similar: %f and Took %s", similarity, elapsed)
+	fmt.Printf("Similar: %f and Took %s", similarity, elapsed)
 }

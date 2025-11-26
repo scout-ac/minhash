@@ -16,8 +16,8 @@ def main():
     for t in tokens2:
         m2.update(t.encode('utf8'))
     similarity = m2.jaccard(m1)
-    elapsed = time.time() - start
-    print("Similar %f and Took %f ms", similarity, elapsed*1000)
+    elapsed = (time.time() - start)*1000
+    print(f"Similar {similarity} and Took {elapsed} ms")
 
 if __name__ == "__main__":
     main()
