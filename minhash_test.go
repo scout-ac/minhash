@@ -4,39 +4,42 @@ import (
 	"testing"
 )
 
+var s = []string{"lorem", "ipsum", "dolor", "sit", "amet", "consectetuer", "adipiscing", "elit", "nulla", "posuere"}
+
 func TestNewPermutations(t *testing.T) {
 	size := 64
-	seed := int64(0)
-	p := NewPermutations(size, seed)
-	if p.size != size {
-		t.Fatalf("Size expected %d but got %d", size, p.size)
+	p, err := NewPermutations(size)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if p.seed != seed {
-		t.Fatalf("Seed expected %d but got %d", seed, p.seed)
+	if p.Size != size {
+		t.Fatalf("Size expected %d but got %d", size, p.Size)
 	}
-	for _, value := range p.values {
-		if value.a < 1 || value.a > mersennePrime {
-			t.Fatalf("Random %d out of bounds", value.a)
+	for _, value := range p.Values {
+		if value.Hi < 1 || value.Hi > mersennePrime {
+			t.Fatalf("Random %d out of bounds", value.Hi)
 		}
-		if value.b < 0 || value.b > mersennePrime {
-			t.Fatalf("Random %d out of bounds", value.b)
+		if value.Lo < 1 || value.Lo > mersennePrime {
+			t.Fatalf("Random %d out of bounds", value.Lo)
 		}
 	}
 }
 
 func TestNewMinhash(t *testing.T) {
-
-	perms := NewPermutations(64, int64(0))
+	perms, err := NewPermutations(64)
+	if err != nil {
+		t.Fatal(err)
+	}
 	m := NewMinhash(perms)
-	if len(m.hashvalues) != perms.size {
-		t.Fatalf("Hashvalues expected size %d but got %d", 64, len(m.hashvalues))
+	if len(m.HashValues) != perms.Size {
+		t.Fatalf("Hashvalues expected size %d but got %d", 64, len(m.HashValues))
 	}
-	if len(m.permutations.values) != perms.size {
-		t.Fatalf("Permutations expected size %d but got %d", 64, len(m.permutations.values))
+	if len(m.Permutations.Values) != perms.Size {
+		t.Fatalf("Permutations expected size %d but got %d", 64, len(m.Permutations.Values))
 	}
 
-	for _, value := range m.hashvalues {
-		if value != infinity {
+	for _, value := range m.HashValues {
+		if value != maxUint64 {
 			t.Fatalf("Expected infinity but got %d", value)
 		}
 	}
@@ -44,24 +47,29 @@ func TestNewMinhash(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	perms := NewPermutations(64, int64(0))
+	perms, err := NewPermutations(64)
+	if err != nil {
+		t.Fatal(err)
+	}
 	m := NewMinhash(perms)
 
-	s := "gosom"
+	s := "lorem"
 	m.Update([]byte(s))
 }
 
 func TestJaccardSame(t *testing.T) {
-	perms := NewPermutations(64, int64(0))
+	perms, err := NewPermutations(64)
+	if err != nil {
+		t.Fatal(err)
+	}
 	m1 := NewMinhash(perms)
 	m2 := NewMinhash(perms)
-	s1 := []string{"gosom", "Giorgos", "Komninos", "g+test@example.com"}
-	for _, s := range s1 {
-		m1.Update([]byte(s))
+
+	for _, word := range s {
+		m1.Update([]byte(word))
 	}
-	s2 := []string{"gosom", "Giorgos", "Komninos", "g+test@example.com"}
-	for _, s := range s2 {
-		m2.Update([]byte(s))
+	for _, word := range s {
+		m2.Update([]byte(word))
 	}
 
 	ans, err := m1.Jaccard(m2)
@@ -74,7 +82,10 @@ func TestJaccardSame(t *testing.T) {
 }
 
 func TestJaccardDifferent(t *testing.T) {
-	perms := NewPermutations(64, int64(0))
+	perms, err := NewPermutations(64)
+	if err != nil {
+		t.Fatal(err)
+	}
 	m1 := NewMinhash(perms)
 	m2 := NewMinhash(perms)
 	s1 := []string{"a", "b", "c", "d"}
@@ -96,7 +107,10 @@ func TestJaccardDifferent(t *testing.T) {
 }
 
 func TestJaccardHalfEqual(t *testing.T) {
-	perms := NewPermutations(60, int64(0))
+	perms, err := NewPermutations(60) // FIXME Should this be 64?
+	if err != nil {
+		t.Fatal(err)
+	}
 	m1 := NewMinhash(perms)
 	m2 := NewMinhash(perms)
 	s1 := []string{"a", "b", "c", "d"}
@@ -119,22 +133,34 @@ func TestJaccardHalfEqual(t *testing.T) {
 }
 
 func TestRandom(t *testing.T) {
-	value := random(uint64(0), uint64(10))
+	value, err := random(uint64(0), uint64(10))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if value > 10 {
 		t.Fatal("Expected less that 10")
 	}
-	value = random(uint64(0), uint64(0))
+	value, err = random(uint64(0), uint64(0))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if value != 0 {
 		t.Fatal("Expected zero")
 	}
-	value = random(uint64(100), uint64(100))
+	value, err = random(uint64(100), uint64(100))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if value != 100 {
 		t.Fatal("Expected hundred")
 	}
 }
 
 func BenchmarkNew(b *testing.B) {
-	perms := NewPermutations(64, int64(0))
+	perms, err := NewPermutations(64)
+	if err != nil {
+		b.Fatal(err)
+	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		NewMinhash(perms)
@@ -142,13 +168,15 @@ func BenchmarkNew(b *testing.B) {
 }
 
 func BenchmarkUpdate(b *testing.B) {
-	s1 := []string{"gosom", "Giorgos", "Komninos", "g+test@gkomninos.com"}
-	perms := NewPermutations(64, int64(0))
+	perms, err := NewPermutations(64)
+	if err != nil {
+		b.Fatal(err)
+	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		m1 := NewMinhash(perms)
-		for _, s := range s1 {
-			m1.Update([]byte(s))
+		for _, word := range s {
+			m1.Update([]byte(word))
 		}
 	}
 }

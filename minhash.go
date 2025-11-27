@@ -1,90 +1,120 @@
+// Package minhash implements the Minhash algorithm.
 package minhash
 
 import (
 	"fmt"
-	"hash/fnv"
-	"math"
-	"math/rand"
+	"math/rand/v2"
+
+	// xxh3 is well-suited as a hash implementation for Minhash.
+	"github.com/zeebo/xxh3"
 )
 
-const (
-	infinity      uint64 = math.MaxUint64
-	mersennePrime        = uint64((1 << 61) - 1)
-)
+// Bitflip zeros to ones to get the max value.
+const maxUint64 uint64 = ^uint64(0)
 
-type permutation struct {
-	a uint64
-	b uint64
+// http://en.wikipedia.org/wiki/Mersenne_prime
+const mersennePrime uint64 = uint64((1 << 61) - 1)
+
+// Permutation describes a permutation for minhash.
+type Permutation struct {
+	Hi uint64
+	Lo uint64
 }
 
-type permutations struct {
-	size   int
-	seed   int64
-	values []permutation
+// Permutations contains all the permutations for minhash.
+type Permutations struct {
+	Size   int
+	Values []Permutation
 }
 
-type minhash struct {
-	permutations *permutations
-	hashvalues   []uint64
+// Minhash contains permutations and hash values.
+type Minhash struct {
+	Permutations *Permutations
+	HashValues   []uint64
 }
 
-func random(min uint64, max uint64) uint64 {
-	return uint64(rand.Int63n(int64(max-min+1))) + min
-}
-
-func NewPermutations(size int, seed int64) *permutations {
-	p := permutations{}
-	p.size = size
-	p.seed = seed
-	p.values = make([]permutation, size)
-	rand.Seed(seed)
-	for i := range p.values {
-		p.values[i] = permutation{random(uint64(1), mersennePrime),
-			random(uint64(0), mersennePrime)}
+func random(lo uint64, hi uint64) (uint64, error) {
+	if hi < lo {
+		return uint64(0), fmt.Errorf("'%d' is not higher than '%d'", hi, lo)
 	}
-	return &p
+	diff := hi - lo
+	// Check for maximum possible value, return full range.
+	if diff == maxUint64 {
+		return rand.Uint64(), nil
+	}
+	return rand.Uint64N(diff+1) + lo, nil
 }
 
-func NewMinhash(permutations *permutations) *minhash {
-	m := minhash{}
-	m.permutations = permutations
+// NewPermutations returns new permutations of the given size.
+func NewPermutations(size int) (*Permutations, error) {
+	p := Permutations{}
+	p.Size = size
+	p.Values = make([]Permutation, size)
+	for i := range p.Values {
+		hi, err := random(uint64(1), mersennePrime)
+		if err != nil {
+			return &Permutations{}, err
+		}
+		lo, err := random(uint64(0), mersennePrime)
+		if err != nil {
+			return &Permutations{}, err
+		}
+		p.Values[i] = Permutation{Hi: hi, Lo: lo}
+	}
+	// fmt.Println(p)
+	return &p, nil
+}
+
+// NewMinhash returns a new Minhash with the given permutations.
+func NewMinhash(perms *Permutations) *Minhash {
+	m := Minhash{}
+	m.Permutations = perms
 	m.initHashvalues()
 	return &m
 }
 
-func (m *minhash) Hashvalues() []uint64 {
-	return m.hashvalues
+// Hashvalues returns the hash values.
+func (m *Minhash) Hashvalues() []uint64 {
+	return m.HashValues
 }
 
-func (m *minhash) Update(b []byte) {
-	hasher := fnv.New32()
+// Update updates the hash values with the given bytes.
+func (m *Minhash) Update(b []byte) {
+	// Create a new hasher every time this func is called. This is necessary
+	// because xxh3 is stateful and will accumulate previous data.
+	// Alternatively, the implementation could use a single hasher on Minhash
+	// and call m.Reset() here.
+	hasher := xxh3.New()
 	hasher.Write(b)
-	val := uint64(hasher.Sum32())
-	for i, hv := range m.hashvalues {
-		hi := (m.permutations.values[i].a*val + m.permutations.values[i].b) % mersennePrime
-		if hi > 0 && hi < hv {
-			m.hashvalues[i] = hi
+	val := uint64(hasher.Sum64())
+	for i, hashVal := range m.HashValues {
+		// Apply the linear hash function h(v) = (a*v + b) mod p
+		// The .Hi and .Lo pairs simulate two independent hashes.
+		newHashVal := (m.Permutations.Values[i].Hi*val + m.Permutations.Values[i].Lo) % mersennePrime
+		// Select the minimum value and update the hash value.
+		if newHashVal > 0 && newHashVal < hashVal {
+			m.HashValues[i] = newHashVal
 		}
 	}
-
 }
 
-func (m *minhash) Jaccard(other *minhash) (float64, error) {
-	if m.permutations.size != other.permutations.size {
+// Jaccard computes the Jaccard similarity with the provided minhash.
+func (m *Minhash) Jaccard(other *Minhash) (float64, error) {
+	if m.Permutations.Size != other.Permutations.Size {
 		return float64(0), fmt.Errorf("Size mismatch")
 	}
 	common := 0
-	for i := range m.hashvalues {
-		if m.hashvalues[i] == other.hashvalues[i] {
+	for i := range m.HashValues {
+		if m.HashValues[i] == other.HashValues[i] {
 			common++
 		}
 	}
-	return float64(common) / float64(m.permutations.size), nil
+	return float64(common) / float64(m.Permutations.Size), nil
 }
 
-func (m *minhash) initHashvalues() {
-	m.hashvalues = make([]uint64, m.permutations.size)
-	for i := range m.hashvalues {
-		m.hashvalues[i] = infinity
+func (m *Minhash) initHashvalues() {
+	m.HashValues = make([]uint64, m.Permutations.Size)
+	for i := range m.HashValues {
+		m.HashValues[i] = maxUint64
 	}
 }

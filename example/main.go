@@ -1,3 +1,4 @@
+// Package main demonstrates how to use minhash.
 package main
 
 import (
@@ -27,7 +28,7 @@ func main() {
 		tokens2 = append(tokens2, line)
 	}
 	start := time.Now()
-	perms := minhash.NewPermutations(64, int64(0))
+	perms, _ := minhash.NewPermutations(64)
 	m1 := minhash.NewMinhash(perms)
 	for _, t := range tokens1 {
 		m1.Update([]byte(t))
